@@ -11,10 +11,6 @@ function define_sets!(m::Model, data::Dict)
     N_sl = m.ext[:sets][:N_sl] = [bus_id for (bus_id,bus) in data["bus"] if bus["bus_type"]==3]
     # Set of AC branches
     B = m.ext[:sets][:B] = [br_id for (br_id,branch) in data["branch"]]
-
-    
-
-
     # Set of shunt elements
     S = m.ext[:sets][:S] = [s_id for (s_id,shunt) in data["shunt"]]
     # Set of generators
@@ -23,10 +19,7 @@ function define_sets!(m::Model, data::Dict)
     L = m.ext[:sets][:L] = [load_id for (load_id,load) in data["load"]]
 
 
-    # Set of DC nodes
-    N_dc = m.ext[:sets][:N_dc] = [bus_id for (bus_id,bus) in data["busdc_ne"]]
-    # Set of DC branches
-    B_dc = m.ext[:sets][:B_dc] = [br_id for (br_id,branch) in data["branchdc_ne"]]
+
     
 
     # Set of AC topology from side (i->j) and to side (j->i)
@@ -41,16 +34,37 @@ function define_sets!(m::Model, data::Dict)
     end
 
 
+    # Set of DC nodes
+    N_dc = m.ext[:sets][:N_dc] = [bus_id for (bus_id,bus) in data["busdc_ne"]]
+    # Set of DC branches
+    B_dc = m.ext[:sets][:B_dc] = [br_id for (br_id,branch) in data["branchdc_ne"]]
+
     # Set of DC topology from side (i->j) and to side (j->i)
     B_dc_fr = m.ext[:sets][:B_dc_fr] = [(br_id, string(br["fbusdc"]), string(br["tbusdc"])) for (br_id,br) in data["branchdc_ne"]] 
     B_dc_to = m.ext[:sets][:B_dc_to] = [(br_id, string(br["tbusdc"]), string(br["fbusdc"])) for (br_id,br) in data["branchdc_ne"]]
     # Build a union set of both sets above
-    B_dc = m.ext[:sets][:B_dc] = [B_dc_fr; B_dc_to]
+    B_dc_to_fr = m.ext[:sets][:B_dc_to_fr] = [B_dc_fr; B_dc_to]
     # Branch connectivity to buses, i.e. which branches are connected to a certain node, used in nodal power balance equations
-    B_dc_arcs = m.ext[:sets][:B_dc_arcs] = Dict((i, []) for i in N) # create a
-    for (l,i,j) in B_dc
+    B_dc_arcs = m.ext[:sets][:B_dc_arcs] = Dict((i, []) for i in N_dc) # create a
+    for (l,i,j) in B_dc_to_fr
         push!(B_dc_arcs[i], (l,i,j))
     end
+
+
+
+    ###Transformer
+    N_tf = m.ext[:sets][:N_tf] = [bus_id for (bus_id,bus) in data["convdc_ne"]]
+    Br_tf_dc_ac = m.ext[:sets][:Br_tf_dc_ac] = [(tf_id, string(tf["busdc_i"]), string(tf["busac_i"])) for (tf_id,tf) in data["convdc_ne"]]
+
+
+    ####Shunt component
+
+
+
+
+    ### phase reactor 
+
+
 
 
     # Shunt connectivity to buses, i.e. which branches are connected to a certain node, used in nodal power balance equations
@@ -82,6 +96,7 @@ function process_parameters!(m::Model, data::Dict)
     S = m.ext[:sets][:S]
     N_dc = m.ext[:sets][:N_dc]
     B_dc = m.ext[:sets][:B_dc]
+    N_tf = m.ext[:sets][:N_tf]
 
 
     # Create parameter dictionary
@@ -95,7 +110,8 @@ function process_parameters!(m::Model, data::Dict)
     vamin = m.ext[:parameters][:vamin] = Dict(i => -pi for i in N) # Arbitrary limit of -pi for minimum bus voltage angle
     vamax = m.ext[:parameters][:vamax] = Dict(i =>  pi for i in N) # Arbitrary limit of  pi for maximum bus voltage angle
 
-    vmmin_dcc = m.ext[:parameters][:vmmin_dc] = Dict(i => data["busdc_ne"][i]["Vdcmin"] for i in N_dc) # minimum voltage magnitude
+    # Bus paramters DC
+    vmmin_dc = m.ext[:parameters][:vmmin_dc] = Dict(i => data["busdc_ne"][i]["Vdcmin"] for i in N_dc) # minimum voltage magnitude
     vmmax_dc = m.ext[:parameters][:vmmax_dc] = Dict(i => data["busdc_ne"][i]["Vdcmax"] for i in N_dc) # maximum voltage magnitude
 
 
@@ -115,6 +131,46 @@ function process_parameters!(m::Model, data::Dict)
     b_shift = m.ext[:parameters][:b_shift] = Dict(b => data["branch"][b]["shift"] for b in B) # maximum voltage angle difference over branch
     b_tap = m.ext[:parameters][:b_tap] = Dict(b => data["branch"][b]["tap"] for b in B)
     
+    # # Branch parameters DC
+    smax_dc = m.ext[:parameters][:smax_dc] = Dict(b => data["branchdc_ne"][b]["rateA"] for b in B_dc) # branch rated power in pu
+    rd = m.ext[:parameters][:rd] = Dict(b => data["branchdc_ne"][b]["r"] for b in B_dc) # branch dc resistance
+
+    # Transformer parameter
+    rtf = m.ext[:parameters][:rtf] = Dict(n => data["convdc_ne"][n]["rtf"] for n in N_tf) # branch reactance
+    xtf = m.ext[:parameters][:xtf] = Dict(n => data["convdc_ne"][n]["xtf"] for n in N_tf) # branch reactance
+    gtf =  m.ext[:parameters][:gtf] = Dict(n => real(1 / (data["convdc_ne"][n]["rtf"] + data["convdc_ne"][n]["xtf"]im)) for n in N_tf) # branch series conductance
+    btf =  m.ext[:parameters][:btf] = Dict(n => imag(1 / (data["convdc_ne"][n]["rtf"] + data["convdc_ne"][n]["xtf"]im)) for n in N_tf) # branch series admittance
+
+
+    tc_tf = m.ext[:parameters][:tc_tf] = Dict(n => data["convdc_ne"][n]["tm"] for n in N_tf) # Transformer winding ratio
+
+    vmax_tf =  m.ext[:parameters][:vmax_tf] = Dict(n => data["convdc_ne"][n]["Vmmax"] for n in N_tf) # Maximum AC active Power
+    vmin_tf =  m.ext[:parameters][:vmin_tf] = Dict(n => data["convdc_ne"][n]["Vmmin"] for n in N_tf) # Maximum AC active Power
+
+    pmax_tf =  m.ext[:parameters][:pmax_tf] = Dict(n => data["convdc_ne"][n]["Pacmax"] for n in N_tf) # Maximum AC active Power
+    pmin_tf = m.ext[:parameters][:pmin_tf] = Dict(n => data["convdc_ne"][n]["Pacmin"] for n in N_tf) # Minumun AC active Power 
+    qmax_tf =  m.ext[:parameters][:qmax_tf] = Dict(n => data["convdc_ne"][n]["Qacmax"] for n in N_tf) # Maximum AC reactive Power
+    qmin_tf = m.ext[:parameters][:qmin_tf] = Dict(n => data["convdc_ne"][n]["Qacmin"] for n in N_tf) # Minumun AC reactive Power 
+
+
+    a_loss_tf = m.ext[:parameters][:a_loss_tf] = Dict(n => data["convdc_ne"][n]["LossA"] for n in N_tf) # zero order losses
+    b_loss_tf = m.ext[:parameters][:b_loss_tf] = Dict(n => data["convdc_ne"][n]["LossB"] for n in N_tf) # first order losses
+    c_loss_tf = m.ext[:parameters][:c_loss_tf] = Dict(n => data["convdc_ne"][n]["LossCrec"] for n in N_tf) # second order losses
+
+
+    # Phase reactor
+
+    rc = m.ext[:parameters][:rc] = Dict(n => data["convdc_ne"][n]["rc"] for n in N_tf) # phase reactance
+    xc = m.ext[:parameters][:xc] = Dict(n => data["convdc_ne"][n]["xc"] for n in N_tf) # phase reactance
+
+
+
+    # Filter
+    
+    bf = m.ext[:parameters][:bf] = Dict(n => data["convdc_ne"][n]["bf"] for n in N_tf) # branch resistance
+
+
+
     # Load parameters: Assuming a fixed demand!
     pd = m.ext[:parameters][:pd] = Dict(l => data["load"][l]["pd"] for l in L)  # active power demand in pu
     qd = m.ext[:parameters][:qd] = Dict(l => data["load"][l]["qd"] for l in L)  # reactive power demand in pu

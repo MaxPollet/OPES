@@ -21,6 +21,11 @@ function build_ac_opf!(m::Model)
     S = m.ext[:sets][:S]
     S_ac = m.ext[:sets][:S_ac]
 
+    N_dc = m.ext[:sets][:N_dc]
+    B_dc = m.ext[:sets][:B_dc]
+    B_dc_to_fr = m.ext[:sets][:B_dc_to_fr]
+    N_tf = m.ext[:sets][:N_tf]
+
     # Extract parameters
     vmmin = m.ext[:parameters][:vmmin]
     vmmax = m.ext[:parameters][:vmmax]
@@ -49,10 +54,65 @@ function build_ac_opf!(m::Model)
     qmin = m.ext[:parameters][:qmin]
     gen_cost = m.ext[:parameters][:gen_cost]
 
+    vmmin_dc = m.ext[:parameters][:vmmin_dc]# minimum voltage magnitude
+    vmmax_dc = m.ext[:parameters][:vmmax_dc]# maximum voltage magnitude
+
+    smax_dc = m.ext[:parameters][:smax_dc] # branch rated power in pu
+    rd = m.ext[:parameters][:rd] # branch dc resistance
+
+    # Transformer parameter
+    rtf = m.ext[:parameters][:rtf] # branch reactance
+    xtf = m.ext[:parameters][:xtf] # branch reactance
+    gtf =  m.ext[:parameters][:gb] # branch series conductance
+    btf =  m.ext[:parameters][:bb] # branch series admittance
+
+
+    tc_tf = m.ext[:parameters][:tc_tf]  # Transformer winding ratio
+
+    vmax_tf =  m.ext[:parameters][:vmax_tf] # Maximum AC active Power
+    vmin_tf =  m.ext[:parameters][:vmin_tf] # Maximum AC active Power
+
+
+    pmax_tf =  m.ext[:parameters][:pmax_tf] # Maximum AC active Power
+    pmin_tf = m.ext[:parameters][:pmin_tf] # Minumun AC active Power 
+    qmax_tf =  m.ext[:parameters][:qmax_tf] # Maximum AC reactive Power
+    qmin_tf = m.ext[:parameters][:qmin_tf]  # Minumun AC reactive Power 
+
+
+    a_loss_tf = m.ext[:parameters][:a_loss_tf] # zero order losses
+    b_loss_tf = m.ext[:parameters][:b_loss_tf] # first order losses
+    c_loss_tf = m.ext[:parameters][:c_loss_tf]  # second order losses
+
+    # Phase reactor
+    rc = m.ext[:parameters][:rc]  # phase reactance
+    xc = m.ext[:parameters][:xc] # phase reactance
+
+    # Filter  
+    bf = m.ext[:parameters][:bf]  # branch resistance
+
+
+
+
+
+
     ##### Create variables 
+    # integer variables
+    # ed = m.ext[:variables][:ed] = @variable(m, [n = N_dc], binary=true, base_name="DC cable") # DC on off parameter
+    # ec = m.ext[:variables][:ec] = @variable(m, [n = N_tf], binary=true, base_name="converter")   # Converter on off parameter
+
     # Bus variables
     vm = m.ext[:variables][:vm] = @variable(m, [i=N], lower_bound = vmmin[i], upper_bound = vmmax[i], base_name = "vm") # voltage magnitude
     va = m.ext[:variables][:va] = @variable(m, [i=N], lower_bound = vamin[i], upper_bound = vamax[i], base_name = "va") # voltage angle
+    # Bus variables DC
+    vm_dc = m.ext[:variables][:vm_dc] = @variable(m, [i=N_dc], lower_bound = vmmin_dc[i], upper_bound = vmmax_dc[i], base_name = "vm_dc") # voltage magnitude
+    # voltage Transformer
+    vm_tf = m.ext[:variables][:vm_tf] = @variable(m, [i=N_tf], lower_bound = vmmin[i], upper_bound = vmmax[i], base_name = "vm_tf") # voltage magnitude
+    va_tf = m.ext[:variables][:va_tf] = @variable(m, [i=N_tf], lower_bound = vamin[i], upper_bound = vamax[i], base_name = "va_tf") # voltage angle
+
+    # # voltage contverter
+
+    vm_cv = m.ext[:variables][:vm_cv] = @variable(m, [i=N_tf], lower_bound = vmmin[i], upper_bound = vmmax[i], base_name = "vm_cv") # voltage magnitude
+    va_cv = m.ext[:variables][:va_cv] = @variable(m, [i=N_tf], lower_bound = vamin[i], upper_bound = vamax[i], base_name = "va_cv") # voltage angle
 
     # Generator variables
     pg = m.ext[:variables][:pg] = @variable(m, [g=G], lower_bound = pmin[g], upper_bound = pmax[g], base_name = "pg") # active and reactive
@@ -61,6 +121,12 @@ function build_ac_opf!(m::Model)
     # Branch variables
     pb = m.ext[:variables][:pb] = @variable(m, [(b,i,j) in B_ac], lower_bound = -smax[b], upper_bound = smax[b], base_name = "pb") # from side active power flow (i->j)
     qb = m.ext[:variables][:qb] = @variable(m, [(b,i,j) in B_ac], lower_bound = -smax[b], upper_bound = smax[b], base_name = "qb") # from side reactive power flow (i->j)
+    # Branch variables DC
+    pb_dc = m.ext[:variables][:pb_dc] = @variable(m, [(b,i,j) in B_dc_to_fr], lower_bound = -smax_dc[b], upper_bound = smax_dc[b], base_name = "pb_dc") # from side active power flow (i->j)
+
+    # # Transformer
+    pb_tf = m.ext[:variables][:pb_tf] = @variable(m, [i in N_tf], lower_bound = pmin_tf[i], upper_bound = pmax_tf[i], base_name = "pb_tf") # from side active power flow (i->j)
+    qb_tf = m.ext[:variables][:qb_tf] = @variable(m, [i in N_tf], lower_bound = qmin_tf[i], upper_bound = qmax_tf[i], base_name = "qb_tf") # from side reactive power flow (i->j)
      
     ##### Objective
     max_gen_ncost = m.ext[:parameters][:gen_max_ncost]
