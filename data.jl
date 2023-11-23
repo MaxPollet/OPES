@@ -54,8 +54,12 @@ function define_sets!(m::Model, data::Dict)
 
     ###Transformer
     N_tf = m.ext[:sets][:N_tf] = [bus_id for (bus_id,bus) in data["convdc_ne"]]
-    Br_tf_dc_ac = m.ext[:sets][:Br_tf_dc_ac] = [(tf_id, string(tf["busdc_i"]), string(tf["busac_i"])) for (tf_id,tf) in data["convdc_ne"]]
+    B_tf_dc_ac_fr = m.ext[:sets][:B_tf_dc_ac_fr] = [(tf_id, string(tf["busdc_i"]), string(tf["busac_i"])) for (tf_id,tf) in data["convdc_ne"]]
+    B_tf_dc_ac_to = m.ext[:sets][:B_tf_dc_ac_to] = [(tf_id, string(tf["busac_i"]), string(tf["busdc_i"])) for (tf_id,tf) in data["convdc_ne"]]
 
+
+    B_tf_dc_ac_to_fr = m.ext[:sets][:B_tf_dc_ac_to_fr] = [B_tf_dc_ac_fr; B_tf_dc_ac_to]
+  
 
     ####Shunt component
 
@@ -134,6 +138,7 @@ function process_parameters!(m::Model, data::Dict)
     # # Branch parameters DC
     smax_dc = m.ext[:parameters][:smax_dc] = Dict(b => data["branchdc_ne"][b]["rateA"] for b in B_dc) # branch rated power in pu
     rd = m.ext[:parameters][:rd] = Dict(b => data["branchdc_ne"][b]["r"] for b in B_dc) # branch dc resistance
+    branch_cost = m.ext[:parameters][:branch_cost] =  Dict(b => data["branchdc_ne"][b]["cost"] for b in B_dc) # cost branch
 
     # Transformer parameter
     rtf = m.ext[:parameters][:rtf] = Dict(n => data["convdc_ne"][n]["rtf"] for n in N_tf) # branch reactance
@@ -152,17 +157,21 @@ function process_parameters!(m::Model, data::Dict)
     qmax_tf =  m.ext[:parameters][:qmax_tf] = Dict(n => data["convdc_ne"][n]["Qacmax"] for n in N_tf) # Maximum AC reactive Power
     qmin_tf = m.ext[:parameters][:qmin_tf] = Dict(n => data["convdc_ne"][n]["Qacmin"] for n in N_tf) # Minumun AC reactive Power 
 
+    # converter 
 
-    a_loss_tf = m.ext[:parameters][:a_loss_tf] = Dict(n => data["convdc_ne"][n]["LossA"] for n in N_tf) # zero order losses
-    b_loss_tf = m.ext[:parameters][:b_loss_tf] = Dict(n => data["convdc_ne"][n]["LossB"] for n in N_tf) # first order losses
-    c_loss_tf = m.ext[:parameters][:c_loss_tf] = Dict(n => data["convdc_ne"][n]["LossCrec"] for n in N_tf) # second order losses
+    a_loss_cv = m.ext[:parameters][:a_loss_cv] = Dict(n => data["convdc_ne"][n]["LossA"] for n in N_tf) # zero order losses
+    b_loss_cv = m.ext[:parameters][:b_loss_cv] = Dict(n => data["convdc_ne"][n]["LossB"] for n in N_tf) # first order losses
+    c_loss_cv = m.ext[:parameters][:c_loss_cv] = Dict(n => data["convdc_ne"][n]["LossCrec"] for n in N_tf) # second order losses
+    
+    i_cv_lim = m.ext[:parameters][:i_cv_lim] = Dict(n => data["convdc_ne"][n]["Imax"] for n in N_tf) # zero order losses
 
-
+    cv_cost = m.ext[:parameters][:cv_cost] = Dict(n => data["convdc_ne"][n]["cost"] for n in N_tf) # cost converter
     # Phase reactor
 
     rc = m.ext[:parameters][:rc] = Dict(n => data["convdc_ne"][n]["rc"] for n in N_tf) # phase reactance
     xc = m.ext[:parameters][:xc] = Dict(n => data["convdc_ne"][n]["xc"] for n in N_tf) # phase reactance
-
+    gc =  m.ext[:parameters][:gc] = Dict(n => real(1 / (data["convdc_ne"][n]["rc"] + data["convdc_ne"][n]["xc"]im)) for n in N_tf) # phase conductance
+    bc =  m.ext[:parameters][:bc] = Dict(n => imag(1 / (data["convdc_ne"][n]["rc"] + data["convdc_ne"][n]["xc"]im)) for n in N_tf) # phase admittance
 
 
     # Filter
