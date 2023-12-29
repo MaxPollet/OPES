@@ -50,6 +50,12 @@
             push!(B_dc_arcs[i], (l,i,j))
         end
     
+
+        B_dc_aux_fr = m.ext[:sets][:B_dc_aux_fr] = [(br_id, string(br["fbusdc"])) for (br_id,br) in data["branchdc_ne"]] 
+        B_dc_aux_to = m.ext[:sets][:B_dc_aux_to] = [(br_id, string(br["tbusdc"])) for (br_id,br) in data["branchdc_ne"]]
+        # Build a union set of both sets above
+        B_dc_aux_to_fr = m.ext[:sets][:B_dc_aux_to_fr] = [B_dc_aux_fr; B_dc_aux_to]
+ 
     
     
         ###Transformer
@@ -104,7 +110,15 @@
         for (l, load) in data["load"]
             push!(L_ac[string(load["load_bus"])], l)
         end
-    
+
+
+
+        N_dc_index = m.ext[:sets][:N_dc_index] = Dict((i, []) for i in N)
+        for (bus_id, bus) in data["busdc_ne"]
+            push!(N_dc_index[string(bus_id)], bus_id)
+        end
+
+
         return
     end
     
@@ -125,6 +139,15 @@
         m.ext[:parameters] = Dict()
     
         baseMVA = m.ext[:parameters][:baseMVA] = data["baseMVA"] # get the base MVA
+        # baseMVA = 1 # get the base MVA
+
+        Pacmax = data["convdc_ne"]["1"]["Pacmax"]
+        Qacmax = data["convdc_ne"]["1"]["Qacmax"]
+
+        Sa = sqrt(Pacmax^2 + Qacmax^2) 
+
+        Zbase = (data["bus"]["1"]["base_kv"])^2/Sa
+        Zbase = 1
     
         # Bus parameters
         vmmin = m.ext[:parameters][:vmmin] = Dict(i => data["bus"][i]["vmin"] for i in N) # minimum voltage magnitude
@@ -138,8 +161,8 @@
     
   
         # Branch parameters
-        rb = m.ext[:parameters][:rb] = Dict(b => data["branch"][b]["br_r"] for b in B) # branch resistance
-        xb = m.ext[:parameters][:xb] = Dict(b => data["branch"][b]["br_x"]  for b in B) # branch reactance
+        rb = m.ext[:parameters][:rb] = Dict(b => (data["branch"][b]["br_r"]) for b in B) # branch resistance
+        xb = m.ext[:parameters][:xb] = Dict(b => (data["branch"][b]["br_x"])  for b in B) # branch reactance
         gb =  m.ext[:parameters][:gb] = Dict(b => real(1 / (data["branch"][b]["br_r"] + data["branch"][b]["br_x"]im)) for b in B) # branch series conductance
         bb =  m.ext[:parameters][:bb] = Dict(b => imag(1 / (data["branch"][b]["br_r"] + data["branch"][b]["br_x"]im)) for b in B) # branch series admittance
         gfr = m.ext[:parameters][:gb_sh_fr] = Dict(b => data["branch"][b]["g_fr"] for b in B) # branch shunt conductance from side i -> j
@@ -147,7 +170,8 @@
         gto = m.ext[:parameters][:gb_sh_to] = Dict(b => data["branch"][b]["g_to"] for b in B) # branch shunt conductance to side j -> i
         bto = m.ext[:parameters][:bb_sh_to] = Dict(b => data["branch"][b]["b_to"] for b in B) # branch shunt susceptance to side  j -> j
         # smax = m.ext[:parameters][:smax] = Dict(b => data["branch"][b]["rate_a"] for b in B) # branch rated power in pu
-        smax = m.ext[:parameters][:smax] = Dict(b => 100 for b in B) # branch rated power in pu
+        smax = m.ext[:parameters][:smax] = Dict(b => (data["branch"][b]["rate_a"])*0.5 for b in B) # branch rated power in pu
+        # smax = m.ext[:parameters][:smax] = Dict(b => 0.4 for b in B) # branch rated power in pu
         imax = m.ext[:parameters][:imax] = Dict(b => data["branch"][b]["c_rating_a"] for b in B if haskey(data["branch"][b],"c_rating_a")) # branch rated power in pu
         angmin = m.ext[:parameters][:angmin] = Dict(b => data["branch"][b]["angmin"] for b in B) # minimum voltage angle difference over branch
         angmax = m.ext[:parameters][:angmax] = Dict(b => data["branch"][b]["angmax"] for b in B) # maximum voltage angle difference over branch
@@ -155,15 +179,15 @@
         b_tap = m.ext[:parameters][:b_tap] = Dict(b => data["branch"][b]["tap"] for b in B)
         
         # Branch parameters DC
-        smax_dc = m.ext[:parameters][:smax_dc] = Dict(b => data["branchdc_ne"][b]["rateA"] for b in B_dc) # branch rated power in pu
+        smax_dc = m.ext[:parameters][:smax_dc] = Dict(b => (data["branchdc_ne"][b]["rateA"])/baseMVA for b in B_dc) # branch rated power in pu
         rd = m.ext[:parameters][:rd] = Dict(b => data["branchdc_ne"][b]["r"] for b in B_dc) # branch dc resistance
         branch_cost = m.ext[:parameters][:branch_cost] =  Dict(b => data["branchdc_ne"][b]["cost"] for b in B_dc) # cost branch
         
         # Transformer parameter
         rtf = m.ext[:parameters][:rtf] = Dict(n => data["convdc_ne"][n]["rtf"] for n in N_tf) # branch reactance
         xtf = m.ext[:parameters][:xtf] = Dict(n => data["convdc_ne"][n]["xtf"] for n in N_tf) # branch reactance
-        gtf =  m.ext[:parameters][:gtf] = Dict(n => real(1 / (data["convdc_ne"][n]["rtf"] + data["convdc_ne"][n]["xtf"]im)) for n in N_tf) # branch series conductance
-        btf =  m.ext[:parameters][:btf] = Dict(n => imag(1 / (data["convdc_ne"][n]["rtf"] + data["convdc_ne"][n]["xtf"]im)) for n in N_tf) # branch series admittance
+        gtf =  m.ext[:parameters][:gtf] = Dict(n => real(1 / (data["convdc_ne"][n]["rtf"] + data["convdc_ne"][n]["xtf"]im))*Zbase for n in N_tf) # branch series conductance
+        btf =  m.ext[:parameters][:btf] = Dict(n => imag(1 / (data["convdc_ne"][n]["rtf"] + data["convdc_ne"][n]["xtf"]im))*Zbase for n in N_tf) # branch series admittance
     
     
         tc_tf = m.ext[:parameters][:tc_tf] = Dict(n => data["convdc_ne"][n]["tm"] for n in N_tf) # Transformer winding ratio
@@ -171,16 +195,16 @@
         vmax_tf =  m.ext[:parameters][:vmax_tf] = Dict(n => data["convdc_ne"][n]["Vmmax"] for n in N_tf) # Maximum AC active Power
         vmin_tf =  m.ext[:parameters][:vmin_tf] = Dict(n => data["convdc_ne"][n]["Vmmin"] for n in N_tf) # Maximum AC active Power
     
-        pmax_tf =  m.ext[:parameters][:pmax_tf] = Dict(n => data["convdc_ne"][n]["Pacmax"] for n in N_tf) # Maximum AC active Power
-        pmin_tf = m.ext[:parameters][:pmin_tf] = Dict(n => data["convdc_ne"][n]["Pacmin"] for n in N_tf) # Minumun AC active Power 
-        qmax_tf =  m.ext[:parameters][:qmax_tf] = Dict(n => data["convdc_ne"][n]["Qacmax"] for n in N_tf) # Maximum AC reactive Power
-        qmin_tf = m.ext[:parameters][:qmin_tf] = Dict(n => data["convdc_ne"][n]["Qacmin"] for n in N_tf) # Minumun AC reactive Power 
+        pmax_tf = m.ext[:parameters][:pmax_tf] = Dict(n => (data["convdc_ne"][n]["Pacmax"])/baseMVA for n in N_tf) # Maximum AC active Power
+        pmin_tf = m.ext[:parameters][:pmin_tf] = Dict(n => (data["convdc_ne"][n]["Pacmin"])/baseMVA for n in N_tf) # Minumun AC active Power 
+        qmax_tf = m.ext[:parameters][:qmax_tf] = Dict(n => (data["convdc_ne"][n]["Qacmax"])/baseMVA for n in N_tf) # Maximum AC reactive Power
+        qmin_tf = m.ext[:parameters][:qmin_tf] = Dict(n => (data["convdc_ne"][n]["Qacmin"])/baseMVA for n in N_tf) # Minumun AC reactive Power 
     
         # converter 
     
-        a_loss_cv = m.ext[:parameters][:a_loss_cv] = Dict(n => data["convdc_ne"][n]["LossA"] for n in N_tf) # zero order losses
-        b_loss_cv = m.ext[:parameters][:b_loss_cv] = Dict(n => data["convdc_ne"][n]["LossB"] for n in N_tf) # first order losses
-        c_loss_cv = m.ext[:parameters][:c_loss_cv] = Dict(n => data["convdc_ne"][n]["LossCrec"] for n in N_tf) # second order losses
+        a_loss_cv = m.ext[:parameters][:a_loss_cv] = Dict(n => data["convdc_ne"][n]["LossA"]/baseMVA for n in N_tf) # zero order losses
+        b_loss_cv = m.ext[:parameters][:b_loss_cv] = Dict(n => data["convdc_ne"][n]["LossB"]/baseMVA for n in N_tf) # first order losses
+        c_loss_cv = m.ext[:parameters][:c_loss_cv] = Dict(n => data["convdc_ne"][n]["LossCrec"]/baseMVA for n in N_tf) # second order losses
         
         i_cv_lim = m.ext[:parameters][:i_cv_lim] = Dict(n => data["convdc_ne"][n]["Imax"] for n in N_tf) # zero order losses
     
@@ -189,8 +213,8 @@
     
         rc = m.ext[:parameters][:rc] = Dict(n => data["convdc_ne"][n]["rc"] for n in N_tf) # phase reactance
         xc = m.ext[:parameters][:xc] = Dict(n => data["convdc_ne"][n]["xc"] for n in N_tf) # phase reactance
-        gc =  m.ext[:parameters][:gc] = Dict(n => real(1 / (data["convdc_ne"][n]["rc"] + data["convdc_ne"][n]["xc"]im)) for n in N_tf) # phase conductance
-        bc =  m.ext[:parameters][:bc] = Dict(n => imag(1 / (data["convdc_ne"][n]["rc"] + data["convdc_ne"][n]["xc"]im)) for n in N_tf) # phase admittance
+        gc =  m.ext[:parameters][:gc] = Dict(n => real(1 / (data["convdc_ne"][n]["rc"] + data["convdc_ne"][n]["xc"]im))*Zbase  for n in N_tf) # phase conductance
+        bc =  m.ext[:parameters][:bc] = Dict(n => imag(1 / (data["convdc_ne"][n]["rc"] + data["convdc_ne"][n]["xc"]im))*Zbase for n in N_tf) # phase admittance
     
     
         # Filter
@@ -203,7 +227,7 @@
         pd = m.ext[:parameters][:pd] = Dict(l => data["load"][l]["pd"] for l in L)  # active power demand in pu
         qd = m.ext[:parameters][:qd] = Dict(l => data["load"][l]["qd"] for l in L)  # reactive power demand in pu
         # pd = m.ext[:parameters][:pd] = Dict(l => 0 for l in L)  # active power demand in pu
-        # qd = m.ext[:parameters][:qd] = Dict(l => 0 for l in L)  # reactive power demand in pu
+        # qd = m.ext[:parameters][:qd] = Dict(l => 2 for l in L)  # reactive power demand in pu
     
         # il_rated = m.ext[:parameters][:il_rated] = Dict(l => (data["load"][l]["pd"]^2 + data["load"][l]["qd"]^2) / 0.9 for l in L)  # active power demand in pu
         
@@ -212,8 +236,8 @@
         bs =  m.ext[:parameters][:bs] = Dict(s => data["shunt"][s]["bs"] for s in S) # branch series admittance
     
         # Generator parameters
-        # pmax = m.ext[:parameters][:pmax] = Dict(g => data["gen"][g]["pmax"] for g in G)  # maximum active power in pu
-        pmax = m.ext[:parameters][:pmax] = Dict(g => 100 for g in G)  # maximum active power in pu
+        pmax = m.ext[:parameters][:pmax] = Dict(g => data["gen"][g]["pmax"] for g in G)  # maximum active power in pu
+        # pmax = m.ext[:parameters][:pmax] = Dict(g => 100 for g in G)  # maximum active power in pu
         pmin = m.ext[:parameters][:pmin] = Dict(g => data["gen"][g]["pmin"] for g in G)  # minimum active power in pu
         qmax = m.ext[:parameters][:qmax] = Dict(g => data["gen"][g]["qmax"] for g in G)  # maximum reactive power in pu
         qmin = m.ext[:parameters][:qmin] = Dict(g => data["gen"][g]["qmin"] for g in G)  # minimum reactive power in pu
