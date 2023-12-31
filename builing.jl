@@ -215,28 +215,6 @@ function build_ac_opf!(m::Model)
     
     m.ext[:objective] = @objective(m, Min, sum(cv_cost[n]*ec[n] for n in N_tf) + sum(branch_cost[b]*ed[b] for (b,i,j) in B_dc_to))
 
-    # max_gen_ncost = m.ext[:parameters][:gen_max_ncost]
-    # if max_gen_ncost == 1
-    #     m.ext[:objective] = @objective(m, Min,
-    #             sum(gen_cost[g][1]
-    #                     for g in G)
-    #     )
-    # elseif max_gen_ncost == 2
-    #     m.ext[:objective] = @objective(m, Min,
-    #             sum(gen_cost[g][1]*pg[g] + gen_cost[g][2]
-    #                     for g in G)
-        # )
-    # elseif max_gen_ncost == 3
-    #     m.ext[:objective] = @NLobjective(m, Min,
-    #             sum(gen_cost[g][1]*pg[g]^2 + gen_cost[g][2]*pg[g] + gen_cost[g][3]
-    #                     for g in G)
-    #     )
-    # elseif max_gen_ncost == 4
-    #     m.ext[:objective] = @NLobjective(m, Min,
-    #             sum(gen_cost[g][1]*pg[g]^3 + gen_cost[g][2]*pg[g]^2 + gen_cost[g][3]*pg[g] + gen_cost[g][4]
-    #                     for g in G)
-    #     )
-    # end
 
 
 
@@ -317,6 +295,11 @@ function build_ac_opf!(m::Model)
     m.ext[:constraints][:pd_ph_ac_dc_lower] = @constraint(m, [(b,i,j) in B_tf_ac_dc],
         pb_ph_ac_dc[(b,i,j)] >=  ec[b]*pmin_tf[b]
     )
+
+
+
+
+
 
 
     m.ext[:constraints][:qd_ph_dc_ac_upper] = @constraint(m, [(b,i,j) in B_tf_dc_ac],
@@ -503,21 +486,39 @@ function build_ac_opf!(m::Model)
 
 
     m.ext[:constraints][:cos_aux_tf_ij_con] = @constraint(m, [(n,i,j) = B_tf_ac_dc],
-        cos_aux_tf_ij[(n,i,j)] >=  (va_aux[i] - va_tf[j])
+        cos_aux_tf_ij[(n,i,j)] ==  (va_aux[i] - va_tf[j])
     )
 
     m.ext[:constraints][:cos_aux_tf_ji_con] = @constraint(m, [(n,i,j) = B_tf_dc_ac],
-        cos_aux_tf_ji[(n,i,j)] >=  (va_aux[j] - va_tf[i])
+        cos_aux_tf_ji[(n,i,j)] ==  (va_aux[j] - va_tf[i])
     )
 
 
     m.ext[:constraints][:cos_aux_ph_ij_con] = @constraint(m, [(n,i,j) = B_tf_ac_dc],
-        cos_aux_ph_ij[(n,i,j)] >=  (va_tf[j] - va_ph[j])
+        cos_aux_ph_ij[(n,i,j)] ==  (va_tf[j] - va_ph[j])
     )
 
     m.ext[:constraints][:cos_aux_ph_ji_con] = @constraint(m, [(n,i,j) = B_tf_dc_ac],
-        cos_aux_ph_ji[(n,i,j)] >=  (va_tf[i] - va_ph[i])
+        cos_aux_ph_ji[(n,i,j)] ==  (va_tf[i] - va_ph[i])
     )
+
+
+
+    m.ext[:constraints][:pd_ph_ac_dc_gen_stop] = @constraint(m, [(b,i,j) in B_tf_ac_dc],
+        pb_ph_ac_dc[(b,i,j)] + pb_ph_dc_ac[(b,j,i)] >=  0
+    )
+
+
+    m.ext[:constraints][:pd_tf_ac_dc_gen_stop] = @constraint(m, [(b,i,j) in B_tf_ac_dc],
+        pb_tf_ac_dc[(b,i,j)] + pb_tf_dc_ac[(b,j,i)] >=  0
+    )
+
+
+    m.ext[:constraints][:pd_tf_ac_dc_gen_stop] = @constraint(m, [(b,i,j) in B_ac],
+        pb[(b,i,j)] + pb[(b,j,i)] >=  0
+    )
+
+
 
 
    ####### cosinus approximation corner
@@ -580,7 +581,7 @@ function build_ac_opf!(m::Model)
         formulation_info_milp_er = PolyhedralRelaxations.construct_univariate_relaxation!(m, f, cos_aux_ph_ji[(n,i,j)] , cos_approx_ph_ji[(n,i,j)], partition, false)
     end
 
-
+    ################ Branch AC power flow
 
 
     m.ext[:constraints][:pbij] = @constraint(m, [(b,i,j) = B_ac_fr], pb[(b, i, j)] ==  (gb[b] + gfr[b])*(1 + 2 *phi_i[i]) /b_tap[b]^2 - (gb[b] * (cos_approx_b_ij[(b,i,j)] + phi_i[i] + phi_i[j]))/b_tap[b] - (bb[b] * (va[i] - va[j]))/b_tap[b]) # active power i to j
@@ -628,7 +629,14 @@ function build_ac_opf!(m::Model)
     m.ext[:constraints][:pbtfdcacji] = @constraint(m, [(n,i,j) = B_tf_dc_ac], pb_tf_dc_ac[(n, i, j)] == ( gtf[n] * (ec[n] + 2*phi_i_aux[j]) - gtf[n]*(ec[n]*cos_approx_tf_ji[(n,i,j)] + phi_i_aux[j] + phi_tf[i]) / tc_tf[n] - btf[n]*(va_tf[i] - va_aux[j])  /tc_tf[n]))  # active power j to i
     m.ext[:constraints][:qbtfdcacji] = @constraint(m, [(n,i,j) = B_tf_dc_ac], qb_tf_dc_ac[(n, i, j)] == (-btf[n] * (ec[n] + 2*phi_i_aux[j]) + btf[n]*(ec[n]*cos_approx_tf_ji[(n,i,j)] + phi_i_aux[j] + phi_tf[i]) / tc_tf[n] - gtf[n]*(va_tf[i] - va_aux[j])  /tc_tf[n])) # reactive power j to i
 
+    # m.ext[:constraints][:pbtfacdcij] = @constraint(m, [(n,i,j) = B_tf_ac_dc], pb_tf_ac_dc[(n, i, j)] == ( gtf[n] * (ec[n] + 2*phi_i_aux[i]) - gtf[n]*(ec[n]*cos_approx_tf_ij[(n,i,j)] + phi_i_aux[i] + phi_tf[j]) - btf[n]*(va_aux[i] - va_tf[j]))) # active power i to j
+    # m.ext[:constraints][:qbtfacdcij] = @constraint(m, [(n,i,j) = B_tf_ac_dc], qb_tf_ac_dc[(n, i, j)] == (-btf[n] * (ec[n] + 2*phi_i_aux[i]) + btf[n]*(ec[n]*cos_approx_tf_ij[(n,i,j)] + phi_i_aux[i] + phi_tf[j]) - gtf[n]*(va_aux[i] - va_tf[j]))) # reactive power i to j
+    # m.ext[:constraints][:pbtfdcacji] = @constraint(m, [(n,i,j) = B_tf_dc_ac], pb_tf_dc_ac[(n, i, j)] == ( gtf[n] * (ec[n] + 2*phi_i_aux[j]) - gtf[n]*(ec[n]*cos_approx_tf_ji[(n,i,j)] + phi_i_aux[j] + phi_tf[i]) - btf[n]*(va_tf[i] - va_aux[j])))  # active power j to i
+    # m.ext[:constraints][:qbtfdcacji] = @constraint(m, [(n,i,j) = B_tf_dc_ac], qb_tf_dc_ac[(n, i, j)] == (-btf[n] * (ec[n] + 2*phi_i_aux[j]) + btf[n]*(ec[n]*cos_approx_tf_ji[(n,i,j)] + phi_i_aux[j] + phi_tf[i]) - gtf[n]*(va_tf[i] - va_aux[j]))) # reactive power j to i
+
+
     
+
     # m.ext[:constraints][:pbtfacdcij] = @constraint(m, [(n,i,j) = B_tf_ac_dc], pb_tf_ac_dc[(n, i, j)] == ( gtf[n] * (ec[n] + 2*phi_i_aux[i])/tc_tf[n]^2 - gtf[n]*(  (ec[n] - 0*(va_aux[i] - va_tf[j])) + phi_i_aux[i] + phi_tf[j]) / tc_tf[n] - btf[n]*(va_aux[i] - va_tf[j])  /tc_tf[n])) # active power i to j
     # m.ext[:constraints][:qbtfacdcij] = @constraint(m, [(n,i,j) = B_tf_ac_dc], qb_tf_ac_dc[(n, i, j)] == (-btf[n] * (ec[n] + 2*phi_i_aux[i])/tc_tf[n]^2 + btf[n]*(  (ec[n] - 0*(va_aux[i] - va_tf[j])) + phi_i_aux[i] + phi_tf[j]) / tc_tf[n] - gtf[n]*(va_aux[i] - va_tf[j])  /tc_tf[n])) # reactive power i to j
     # m.ext[:constraints][:pbtfdcacji] = @constraint(m, [(n,i,j) = B_tf_dc_ac], pb_tf_dc_ac[(n, i, j)] == ( gtf[n] * (ec[n] + 2*phi_i_aux[j]) - gtf[n]*(  (ec[n] - 0*(va_aux[j] - va_tf[i])) + phi_i_aux[j] + phi_tf[i]) / tc_tf[n] - btf[n]*(va_tf[i] - va_aux[j])  /tc_tf[n]))  # active power j to i
@@ -676,18 +684,15 @@ function build_ac_opf!(m::Model)
 
 
 
-    ####### convertere power flow constraint
+    ####### converter power flow constraint
 
     m.ext[:constraints][:ei_lower] = @constraint(m, [n in N_tf], (1 - 2*(ei[n]))*(i_cv[n]) >= 0.9*(i_cv[n])) # ei is 1 when I_cv is negative 
     m.ext[:constraints][:ei_upper] = @constraint(m, [n in  N_tf], ei[n] <= ec[n]) # ei is 0 when I_cv is positive 
 
 
 
-
-
-
-    m.ext[:constraints][:ec_ed_con] =  @constraint(m, [i in N_dc_ac_connected], sum(ed[n] for (n,k,j) in B_dc_arcs[i]) >= ec[i]) 
-    m.ext[:constraints][:ec_ed_con] =  @constraint(m, [(n,i,j) in B_dc_to], ec[j] + ec[i] >= 1.1*ed[n]) 
+    # m.ext[:constraints][:ec_ed_con] =  @constraint(m, [i in N_dc_ac_connected], sum(ed[n] for (n,k,j) in B_dc_arcs[i]) >= ec[i]) 
+    # m.ext[:constraints][:ec_ed_con] =  @constraint(m, [(n,i,j) in B_dc_to], ec[j] + ec[i] >= 1.1*ed[n]) 
 
 
 
@@ -695,8 +700,8 @@ function build_ac_opf!(m::Model)
 
 
     # m.ext[:constraints][:pbcvij] = @constraint(m, [(n,i,j) = B_tf_dc_ac], pb_dc_node[i] -  pb_ph_dc_ac[(n,i,j)] == (a_loss_cv[n]* ec[n] + b_loss_cv[n] * (-pb_ph_dc_ac[(n,i,j)]))) # check als tekens en richtigen goed zijn
-    m.ext[:constraints][:pbcvij] = @constraint(m, [(n,i,j) = B_tf_dc_ac], pb_dc_node[i] +  pb_ph_dc_ac[(n,i,j)] == (a_loss_cv[n]* ec[n] + b_loss_cv[n] * (1 - 2*(ei[n]))*(i_cv[n]))) # check als tekens en richtigen goed zijn
-    # m.ext[:constraints][:pbcvij] = @constraint(m, [(n,i,j) = B_tf_dc_ac], pb_dc_node[i] +  pb_ph_dc_ac[(n,i,j)] == 0) # check als tekens en richtigen goed zijn
+    m.ext[:constraints][:pbcvij] = @constraint(m, [(n,i,j) = B_tf_dc_ac],- pb_dc_node[i] -  pb_ph_dc_ac[(n,i,j)] == (a_loss_cv[n]* ec[n] + b_loss_cv[n] * (1 - 2*(ei[n]))*(i_cv[n]))) # check als tekens en richtigen goed zijn
+    # m.ext[:constraints][:pbcvij] = @constraint(m, [(n,i,j) = B_tf_dc_ac], -pb_dc_node[i] -  pb_ph_dc_ac[(n,i,j)] == 0) # check als tekens en richtigen goed zijn
     m.ext[:constraints][:pqbcvij] = @constraint(m, [(n,i,j) = B_tf_dc_ac], pb_ph_dc_ac[(n,i,j)]^2 + qb_ph_dc_ac[(n,i,j)]^2 <= pmax_tf[n]^2 + qmax_tf[n]^2) # check als tekens en richtigen goed zijn
 
 

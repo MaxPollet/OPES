@@ -59,7 +59,7 @@ pg = value.(m.ext[:variables][:pg])
 #####
 
 ####### see what the power is on the ac branch
-println("Power trough ac branch")
+println("Power through ac branch")
 for (n,j,i) in m.ext[:sets][:B_ac]
     print((n,j,i))
     print("=>")
@@ -201,7 +201,7 @@ end
 
 
 
-println("see what the power trough the transfor to the dc side is: ")
+println("see what the power through the transfor to the dc side is: ")
 for n in m.ext[:sets][:N_tf]
         print(n)
         print("=>")
@@ -214,6 +214,17 @@ println("Total DC losses ")
 sumy = 0
 for n in m.ext[:sets][:N]
         sumy = sumy + value(m.ext[:variables][:pb_tf_ac_dc][(n,n,n)])
+
+end
+
+print("=>")
+println(sumy)
+
+
+println("Total AC branch losses ")
+sumy = 0
+for (n,i,j) in m.ext[:sets][:B_ac]
+        sumy = sumy + value(m.ext[:variables][:pb][(n,i,j)])
 
 end
 
