@@ -139,7 +139,7 @@ function build_ac_opf!(m::Model)
 
     # Bus variables DC
     phi_dc = m.ext[:variables][:phi_dc] = @variable(m, [i=N_dc], lower_bound =  vmin_dc[i] - 1,upper_bound =  vmax_dc[i] - 1, base_name = "phi_dc") # voltage magnitude
-    phi_dc_aux = m.ext[:variables][:phi_dc_aux] = @variable(m, [(n,i) = B_dc_aux_to_fr], vmin_dc[i] - 1,upper_bound =  vmax_dc[i] - 1, base_name = "phi_dc_aux") #auxilary voltage magnitude
+    phi_dc_aux = m.ext[:variables][:phi_dc_aux] = @variable(m, [(n,i) = B_dc_aux_to_fr], lower_bound = vmin_dc[i] - 1,upper_bound =  vmax_dc[i] - 1, base_name = "phi_dc_aux") #auxilary voltage magnitude
    
     # voltage Transformer
     va_tf = m.ext[:variables][:va_tf] = @variable(m, [i=N_tf], lower_bound = vamin[i], upper_bound = vamax[i], base_name = "va_tf") # voltage angle
