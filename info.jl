@@ -182,7 +182,9 @@ function process_parameters!(m::Model, data::Dict)
     smax_dc = m.ext[:parameters][:smax_dc] = Dict(b => (data["branchdc_ne"][b]["rateA"])/baseMVA for b in B_dc) # branch rated power in pu
     rd = m.ext[:parameters][:rd] = Dict(b => data["branchdc_ne"][b]["r"] for b in B_dc) # branch dc resistance
     branch_cost = m.ext[:parameters][:branch_cost] =  Dict(b => data["branchdc_ne"][b]["cost"] for b in B_dc) # cost branch
-    
+    vmax_dc =  m.ext[:parameters][:vmax_dc] = Dict(n => data["convdc_ne"][n]["Vmmax"] for n in N_dc) # Maximum AC active Power
+    vmin_dc =  m.ext[:parameters][:vmin_dc] = Dict(n => data["convdc_ne"][n]["Vmmin"] for n in N_dc) # Maximum AC active Power
+  
     # Transformer parameter
     rtf = m.ext[:parameters][:rtf] = Dict(n => data["convdc_ne"][n]["rtf"] for n in N_tf) # branch reactance
     xtf = m.ext[:parameters][:xtf] = Dict(n => (data["convdc_ne"][n]["xtf"]) for n in N_tf) # branch reactance

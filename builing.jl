@@ -1,6 +1,6 @@
 function build_ac_opf!(m::Model)
 
-    # This function builds the polar form of a nonlinear AC power flow formulation
+    # This function builds the polar form of a linear AC power flow formulation
 
     # Create m.ext entries "variables", "expressions" and "constraints"
     m.ext[:variables] = Dict()
@@ -72,17 +72,18 @@ function build_ac_opf!(m::Model)
     qmax = m.ext[:parameters][:qmax]
     qmin = m.ext[:parameters][:qmin]
     gen_cost = m.ext[:parameters][:gen_cost]
-
-    vmmin_dc = m.ext[:parameters][:vmmin_dc]# minimum voltage magnitude
-    vmmax_dc = m.ext[:parameters][:vmmax_dc]# maximum voltage magnitude
+    vmmin_dc = m.ext[:parameters][:vmmin_dc]
+    vmmax_dc = m.ext[:parameters][:vmmax_dc]
 
     #branch DC parameters
     smax_dc = m.ext[:parameters][:smax_dc] # branch rated power in pu
     rd = m.ext[:parameters][:rd] # branch dc resistance
     branch_cost = m.ext[:parameters][:branch_cost] =  Dict(b => data["branchdc_ne"][b]["cost"] for b in B_dc) # cost branch
+    vmax_dc =  m.ext[:parameters][:vmax_dc]
+    vmin_dc =  m.ext[:parameters][:vmin_dc]
 
     # Transformer parameter
-    rtf = m.ext[:parameters][:rtf] # branch reactance
+    rtf = m.ext[:parameters][:rtf] # branch resistance
     xtf = m.ext[:parameters][:xtf] # branch reactance
     gtf =  m.ext[:parameters][:gtf] # branch series conductance
     btf =  m.ext[:parameters][:btf] # branch series admittance
@@ -90,18 +91,18 @@ function build_ac_opf!(m::Model)
 
     tc_tf = m.ext[:parameters][:tc_tf]  # Transformer winding ratio
 
-    vmax_tf =  m.ext[:parameters][:vmax_tf] # Maximum AC active Power
-    vmin_tf =  m.ext[:parameters][:vmin_tf] # Maximum AC active Power
+    vmax_tf =  m.ext[:parameters][:vmax_tf] # Maximum transformer voltage magnitude 
+    vmin_tf =  m.ext[:parameters][:vmin_tf] # Minimum transformer voltage magnitude
 
 
-    pmax_tf = m.ext[:parameters][:pmax_tf] # Maximum AC active Power
-    pmin_tf = m.ext[:parameters][:pmin_tf] # Minumun AC active Power 
-    qmax_tf = m.ext[:parameters][:qmax_tf] # Maximum AC reactive Power
-    qmin_tf = m.ext[:parameters][:qmin_tf]  # Minumun AC reactive Power 
+    pmax_tf = m.ext[:parameters][:pmax_tf] # Maximum transformer active Power
+    pmin_tf = m.ext[:parameters][:pmin_tf] # Minumun transformer active Power 
+    qmax_tf = m.ext[:parameters][:qmax_tf] # Maximum transformer reactive Power
+    qmin_tf = m.ext[:parameters][:qmin_tf]  # Minumun transformer reactive Power 
 
 
     # Phase reactor
-    rc = m.ext[:parameters][:rc]  # phase reactance
+    rc = m.ext[:parameters][:rc]  # phase resistance
     xc = m.ext[:parameters][:xc] # phase reactance
     gc =  m.ext[:parameters][:gc] # phase conductance
     bc =  m.ext[:parameters][:bc] # phase admittance
@@ -125,8 +126,6 @@ function build_ac_opf!(m::Model)
     # integer variables
     ed = m.ext[:variables][:ed] = @variable(m, [n = B_dc], binary=true, base_name="DC cable") # DC on off parameter
     ec = m.ext[:variables][:ec] = @variable(m, [n = N_tf], binary=true, base_name="converter")   # Converter on off parameter
-    # ed = m.ext[:variables][:ed] = Dict(n => 0 for n in B_dc)  # active power demand in pu
-    # ec = m.ext[:variables][:ec] = Dict(n => 0 for n in N_tf)  # reactive power demand in pu
 
     ei = m.ext[:variables][:ei] = @variable(m, [n = N_tf], binary=true, base_name="I_cv abs auxilary") # DC on off parameter
 
@@ -135,32 +134,29 @@ function build_ac_opf!(m::Model)
     phi_i = m.ext[:variables][:phi_i] = @variable(m, [n = N], base_name = "phi_i") #  phi i variable
     phi_i_aux = m.ext[:variables][:phi_i_aux] = @variable(m, [n = N], base_name = "phi_i_aux") #  phi i auxilary variable
     va = m.ext[:variables][:va] = @variable(m, [i=N], lower_bound = vamin[i], upper_bound = vamax[i], base_name = "va") # voltage angle
-    va_aux = m.ext[:variables][:va_aux] = @variable(m, [i=N], lower_bound = vamin[i], upper_bound = vamax[i], base_name = "va_aux") # voltage angle
+    va_aux = m.ext[:variables][:va_aux] = @variable(m, [i=N], lower_bound = vamin[i], upper_bound = vamax[i], base_name = "va_aux") # voltage auxilary angle
 
 
     # Bus variables DC
-    # vm_dc = m.ext[:variables][:vm_dc] = @variable(m, [i=N_dc], lower_bound = vmmin_dc[i], upper_bound = vmmax_dc[i], base_name = "vm_dc") # voltage magnitude
-    phi_dc = m.ext[:variables][:phi_dc] = @variable(m, [i=N_dc], lower_bound = -0.1, upper_bound = 0.1, base_name = "phi_dc") # voltage magnitude
-    phi_dc_aux = m.ext[:variables][:phi_dc_aux] = @variable(m, [(n,i) = B_dc_aux_to_fr], lower_bound = -0.1, upper_bound = 0.1, base_name = "phi_dc_aux") # voltage magnitude
+    phi_dc = m.ext[:variables][:phi_dc] = @variable(m, [i=N_dc], lower_bound =  vmin_dc[i] - 1,upper_bound =  vmax_dc[i] - 1, base_name = "phi_dc") # voltage magnitude
+    phi_dc_aux = m.ext[:variables][:phi_dc_aux] = @variable(m, [(n,i) = B_dc_aux_to_fr], vmin_dc[i] - 1,upper_bound =  vmax_dc[i] - 1, base_name = "phi_dc_aux") #auxilary voltage magnitude
    
     # voltage Transformer
     va_tf = m.ext[:variables][:va_tf] = @variable(m, [i=N_tf], lower_bound = vamin[i], upper_bound = vamax[i], base_name = "va_tf") # voltage angle
-    va_tf_aux = m.ext[:variables][:va_tf_aux] = @variable(m, [i=N_tf], lower_bound = vamin[i], upper_bound = vamax[i], base_name = "va_tf_aux") # voltage angle
-    phi_tf = m.ext[:variables][:phi_tf] = @variable(m, [i=N_tf], lower_bound = -0.1, upper_bound = 0.1, base_name = "phi_tf") # voltage magnitude difference
-    phi_tf_aux = m.ext[:variables][:phi_tf_aux] = @variable(m, [i=N_tf], lower_bound = -0.1, upper_bound = 0.1, base_name = "phi_tf_aux") # voltage magnitude difference
+    va_tf_aux = m.ext[:variables][:va_tf_aux] = @variable(m, [i=N_tf], lower_bound = vamin[i], upper_bound = vamax[i], base_name = "va_tf_aux") # voltage auxilary angle
+    phi_tf = m.ext[:variables][:phi_tf] = @variable(m, [i=N_tf], lower_bound =  vmin_tf[i] - 1, upper_bound = vmax_tf[i] - 1, base_name = "phi_tf") # voltage  magnitude difference
+    phi_tf_aux = m.ext[:variables][:phi_tf_aux] = @variable(m, [i=N_tf], lower_bound = vmin_tf[i] - 1, upper_bound = vmax_tf[i] - 1, base_name = "phi_tf_aux") # auxilary voltage magnitude difference
 
 
     #voltage phase reactor
-    va_ph = m.ext[:variables][:va_ph] = @variable(m, [i=N_tf], lower_bound = vamin[i], upper_bound = vamax[i], base_name = "va_ph") # voltage angle
-    phi_ph = m.ext[:variables][:phi_ph] = @variable(m, [i=N_tf], lower_bound = -0.1, upper_bound = 0.1, base_name = "phi_ph") # voltage magnitude difference
+    va_ph = m.ext[:variables][:va_ph] = @variable(m, [i=N_tf], lower_bound = vmin_tf[i] - 1, upper_bound = vmax_tf[i] - 1, base_name = "va_ph") # voltage angle
+    phi_ph = m.ext[:variables][:phi_ph] = @variable(m, [i=N_tf], lower_bound = vmin_tf[i] - 1, upper_bound = vmax_tf[i] - 1, base_name = "phi_ph") # voltage magnitude difference
 
 
 
     # Generator variables
     pg = m.ext[:variables][:pg] = @variable(m, [g=G], lower_bound = pmin[g], upper_bound = pmax[g], base_name = "pg") # active and reactive
     qg = m.ext[:variables][:qg] = @variable(m, [g=G], lower_bound = qmin[g], upper_bound = qmax[g], base_name = "qg") # voltage angle
-    # pg = m.ext[:variables][:pg] = Dict(g => 0 for g in G)  # active power demand in pu
-    # qg = m.ext[:variables][:qg] = Dict(g => 0 for g in G)  # reactive power demand in pu
 
     # # Branch variables
     pb = m.ext[:variables][:pb] = @variable(m, [(b,i,j) in B_ac], lower_bound = -smax[b], upper_bound = smax[b], base_name = "pb") # from side active power flow (i->j)
@@ -170,9 +166,7 @@ function build_ac_opf!(m::Model)
     pb_dc = m.ext[:variables][:pb_dc] = @variable(m, [(b,i,j) in B_dc_to_fr], lower_bound = -smax_dc[b], upper_bound = smax_dc[b], base_name = "pb_dc") # from side active power flow (i->j)
 
     # # Transformer
-    # pb_tf = m.ext[:variables][:pb_tf] = @variable(m, [(b,i,j) = B_tf_dc_ac_to_fr], lower_bound = pmin_tf[b], upper_bound = pmax_tf[b], base_name = "pb_tf") # from side active power flow (i->j)
-    # qb_tf = m.ext[:variables][:qb_tf] = @variable(m, [(b,i,j) = B_tf_dc_ac_to_fr], lower_bound = qmin_tf[b], upper_bound = qmax_tf[b], base_name = "qb_tf") # from side reactive power flow (i->j)
-     
+ 
     pb_tf_dc_ac = m.ext[:variables][:pb_tf_dc_ac] = @variable(m, [(b,i,j) = B_tf_dc_ac], lower_bound = pmin_tf[b], upper_bound = pmax_tf[b], base_name = "pb_tf_dc_ac") # from side active power flow (i->j)
     pb_tf_ac_dc = m.ext[:variables][:pb_tf_ac_dc] = @variable(m, [(b,i,j) = B_tf_ac_dc], lower_bound = pmin_tf[b], upper_bound = pmax_tf[b], base_name = "pb_tf_ac_dc") # from side active power flow (i->j)
     qb_tf_dc_ac = m.ext[:variables][:qb_tf_dc_ac] = @variable(m, [(b,i,j) = B_tf_dc_ac], lower_bound = qmin_tf[b], upper_bound = qmax_tf[b], base_name = "qb_tf_dc_ac") # from side reactive power flow (i->j)
@@ -180,9 +174,7 @@ function build_ac_opf!(m::Model)
 
 
     # # phase 
-    # # pb_ph = m.ext[:variables][:pb_ph] = @variable(m, [(b,i,j) = B_tf_dc_ac_to_fr], lower_bound = pmin_tf[b], upper_bound = pmax_tf[b], base_name = "pb_ph") # from side active power flow (i->j)
-    # # qb_ph = m.ext[:variables][:qb_ph] = @variable(m, [(b,i,j) = B_tf_dc_ac_to_fr], lower_bound = qmin_tf[b], upper_bound = qmax_tf[b], base_name = "qb_ph") # from side reactive power flow (i->j)
- 
+
     pb_ph_dc_ac = m.ext[:variables][:pb_ph_dc_ac] = @variable(m, [(b,i,j) = B_tf_dc_ac], lower_bound = pmin_tf[b], upper_bound = pmax_tf[b], base_name = "pb_ph_dc_ac") # from side active power flow (i->j)
     pb_ph_ac_dc = m.ext[:variables][:pb_ph_ac_dc] = @variable(m, [(b,i,j) = B_tf_ac_dc], lower_bound = pmin_tf[b], upper_bound = pmax_tf[b], base_name = "pb_ph_ac_dc") # from side active power flow (i->j)
     qb_ph_dc_ac = m.ext[:variables][:qb_ph_dc_ac] = @variable(m, [(b,i,j) = B_tf_dc_ac], lower_bound = qmin_tf[b], upper_bound = qmax_tf[b], base_name = "qb_ph_dc_ac") # from side reactive power flow (i->j)
@@ -217,7 +209,7 @@ function build_ac_opf!(m::Model)
 
 
 
-
+    ######### on off contraints, auxilary contrains, cosinus constraints
  
     m.ext[:constraints][:pd_dc_upper] = @constraint(m, [(b,i,j) in B_dc_to_fr],
         pb_dc[(b,i,j)] <=  ed[b]*smax_dc[b]
@@ -288,12 +280,12 @@ function build_ac_opf!(m::Model)
         pb_ph_dc_ac[(b,i,j)] >=  ec[b]*pmin_tf[b]
     )
 
-    m.ext[:constraints][:pd_ph_ac_dc_upper] = @constraint(m, [(b,i,j) in B_tf_ac_dc],
-        pb_ph_ac_dc[(b,i,j)] <=  ec[b]*pmax_tf[b]
+    m.ext[:constraints][:pd_ph_ac_dc_upper] = @constraint(m, [(b,j,i) in B_tf_ac_dc],
+        pb_ph_ac_dc[(b,j,i)] <=  ec[b]*pmax_tf[b]
     )
 
-    m.ext[:constraints][:pd_ph_ac_dc_lower] = @constraint(m, [(b,i,j) in B_tf_ac_dc],
-        pb_ph_ac_dc[(b,i,j)] >=  ec[b]*pmin_tf[b]
+    m.ext[:constraints][:pd_ph_ac_dc_lower] = @constraint(m, [(b,j,i) in B_tf_ac_dc],
+        pb_ph_ac_dc[(b,j,i)] >=  ec[b]*pmin_tf[b]
     )
 
 
@@ -310,12 +302,12 @@ function build_ac_opf!(m::Model)
         qb_ph_dc_ac[(b,i,j)] >=  ec[b]*qmin_tf[b]
     )
 
-    m.ext[:constraints][:qd_ph_ac_dc_upper] = @constraint(m, [(b,i,j) in B_tf_ac_dc],
-        qb_ph_ac_dc[(b,i,j)] <=  ec[b]*qmax_tf[b]
+    m.ext[:constraints][:qd_ph_ac_dc_upper] = @constraint(m, [(b,j,i) in B_tf_ac_dc],
+        qb_ph_ac_dc[(b,j,i)] <=  ec[b]*qmax_tf[b]
     )
 
-    m.ext[:constraints][:qd_ph_ac_dc_lower] = @constraint(m, [(b,i,j) in B_tf_ac_dc],
-        qb_ph_ac_dc[(b,i,j)] >=  ec[b]*qmin_tf[b]
+    m.ext[:constraints][:qd_ph_ac_dc_lower] = @constraint(m, [(b,j,i) in B_tf_ac_dc],
+        qb_ph_ac_dc[(b,j,i)] >=  ec[b]*qmin_tf[b]
     )
 
     
@@ -489,13 +481,13 @@ function build_ac_opf!(m::Model)
         cos_aux_tf_ij[(n,i,j)] ==  (va_aux[i] - va_tf[j])
     )
 
-    m.ext[:constraints][:cos_aux_tf_ji_con] = @constraint(m, [(n,i,j) = B_tf_dc_ac],
-        cos_aux_tf_ji[(n,i,j)] ==  (va_aux[j] - va_tf[i])
+    m.ext[:constraints][:cos_aux_tf_ji_con] = @constraint(m, [(n,j,i) = B_tf_dc_ac],
+        cos_aux_tf_ji[(n,j,i)] ==  (va_aux[j] - va_tf[i])
     )
 
 
-    m.ext[:constraints][:cos_aux_ph_ij_con] = @constraint(m, [(n,i,j) = B_tf_ac_dc],
-        cos_aux_ph_ij[(n,i,j)] ==  (va_tf[j] - va_ph[j])
+    m.ext[:constraints][:cos_aux_ph_ij_con] = @constraint(m, [(n,j,i) = B_tf_ac_dc],
+        cos_aux_ph_ij[(n,j,i)] ==  (va_tf[j] - va_ph[j])
     )
 
     m.ext[:constraints][:cos_aux_ph_ji_con] = @constraint(m, [(n,i,j) = B_tf_dc_ac],
@@ -526,18 +518,14 @@ function build_ac_opf!(m::Model)
     cos_approx_b_ij = m.ext[:variables][:cos_approx_b_ij] = JuMP.@variable(m, [(b,i,j) in B_ac_fr])
     for (b,i,j) in B_ac_fr
         
-        # f = x -> cos(x)
-        f, partition = (x) -> cos(x ), collect(-1.0:0.25:1.0)
-        # a = construct_univariate_relaxation!(m, f, x, y, [-1.0, 0.0, 1.0], true)
+        f, partition = (x) -> cos(x ), collect(-pi/3:pi/60:pi/3)
         formulation_info_milp = PolyhedralRelaxations.construct_univariate_relaxation!(m, f, cos_aux_b_ij[(b,i,j)] , cos_approx_b_ij[(b,i,j)], partition, false)
     end
 
     cos_approx_b_ji =  m.ext[:variables][:cos_approx_b_ji] = JuMP.@variable(m, [(b,j,i) in B_ac_to])
     for (b,j,i) in B_ac_to
         
-        # f = x -> cos(x)
-        f, partition = (x) -> cos(x ), collect(-1.0:0.25:1.0)
-        # a = construct_univariate_relaxation!(m, f, x, y, [-1.0, 0.0, 1.0], true)
+        f, partition = (x) -> cos(x ),collect(-pi/3:pi/60:pi/3)
         formulation_info_milp_er = PolyhedralRelaxations.construct_univariate_relaxation!(m, f, cos_aux_b_ji[(b,j,i)] , cos_approx_b_ji[(b,j,i)], partition, false)
     end
 
@@ -546,18 +534,14 @@ function build_ac_opf!(m::Model)
     cos_approx_tf_ij = m.ext[:variables][:cos_approx_tf_ij] = JuMP.@variable(m, [(n,i,j) in B_tf_ac_dc])
     for (n,i,j) in B_tf_ac_dc
         
-        # f = x -> cos(x)
-        f, partition = (x) -> cos(x ), collect(-1.0:0.25:1.0)
-        # a = construct_univariate_relaxation!(m, f, x, y, [-1.0, 0.0, 1.0], true)
+        f, partition = (x) -> cos(x ),collect(-pi/3:pi/60:pi/3)
         formulation_info_milp = PolyhedralRelaxations.construct_univariate_relaxation!(m, f, cos_aux_tf_ij[(n,i,j)] , cos_approx_tf_ij[(n,i,j)], partition, false)
     end
 
     cos_approx_tf_ji =  m.ext[:variables][:cos_approx_tf_ji] = JuMP.@variable(m, [(n,i,j) in B_tf_dc_ac])
     for (n,i,j) in B_tf_dc_ac
         
-        # f = x -> cos(x)
-        f, partition = (x) -> cos(x ), collect(-1.0:0.25:1.0)
-        # a = construct_univariate_relaxation!(m, f, x, y, [-1.0, 0.0, 1.0], true)
+        f, partition = (x) -> cos(x ),collect(-pi/3:pi/60:pi/3)
         formulation_info_milp_er = PolyhedralRelaxations.construct_univariate_relaxation!(m, f, cos_aux_tf_ji[(n,i,j)] , cos_approx_tf_ji[(n,i,j)], partition, false)
     end
 
@@ -566,18 +550,14 @@ function build_ac_opf!(m::Model)
     cos_approx_ph_ij = m.ext[:variables][:cos_approx_ph_ij] = JuMP.@variable(m, [(n,i,j) in B_tf_ac_dc])
     for (n,i,j) in B_tf_ac_dc
         
-        # f = x -> cos(x)
-        f, partition = (x) -> cos(x ), collect(-1.0:0.25:1.0)
-        # a = construct_univariate_relaxation!(m, f, x, y, [-1.0, 0.0, 1.0], true)
+        f, partition = (x) -> cos(x ),collect(-pi/3:pi/60:pi/3)
         formulation_info_milp = PolyhedralRelaxations.construct_univariate_relaxation!(m, f, cos_aux_ph_ij[(n,i,j)] , cos_approx_ph_ij[(n,i,j)], partition, false)
     end
 
     cos_approx_ph_ji =  m.ext[:variables][:cos_approx_ph_ji] = JuMP.@variable(m, [(n,i,j) in B_tf_dc_ac])
     for (n,i,j) in B_tf_dc_ac
         
-        # f = x -> cos(x)
-        f, partition = (x) -> cos(x ), collect(-1.0:0.25:1.0)
-        # a = construct_univariate_relaxation!(m, f, x, y, [-1.0, 0.0, 1.0], true)
+        f, partition = (x) -> cos(x ), collect(-pi/3:pi/60:pi/3)
         formulation_info_milp_er = PolyhedralRelaxations.construct_univariate_relaxation!(m, f, cos_aux_ph_ji[(n,i,j)] , cos_approx_ph_ji[(n,i,j)], partition, false)
     end
 
@@ -615,8 +595,8 @@ function build_ac_opf!(m::Model)
  
  
     # # DC cables power flow contrains
-    m.ext[:constraints][:pbdcij] = @constraint(m, [(n,i,j) = B_dc_to], pb_dc[(n, i, j)] ==  (phi_dc_aux[(n,i)] - phi_dc_aux[(n,j)])/ (rd[n] + 0.01)) # active power i to j
-    m.ext[:constraints][:pbdcji] = @constraint(m, [(n,i,j) = B_dc_fr], pb_dc[(n, i, j)] ==  (phi_dc_aux[(n,i)] - phi_dc_aux[(n,j)])/ (rd[n] + 0.01)) # active power i to j
+    m.ext[:constraints][:pbdcij] = @constraint(m, [(n,i,j) = B_dc_to], pb_dc[(n, i, j)] ==  (phi_dc_aux[(n,i)] - phi_dc_aux[(n,j)])/ (rd[n] + 0.001)) # active power i to j
+    m.ext[:constraints][:pbdcji] = @constraint(m, [(n,i,j) = B_dc_fr], pb_dc[(n, i, j)] ==  (phi_dc_aux[(n,i)] - phi_dc_aux[(n,j)])/ (rd[n] + 0.001)) # active power i to j
 
     # m.ext[:constraints][:pbdcij] = @constraint(m, [(n,i,j) = B_dc_to], pb_dc[(n, i, j)] ==  0) # active power i to j
     # m.ext[:constraints][:pbdcji] = @constraint(m, [(n,i,j) = B_dc_fr], pb_dc[(n, i, j)] ==  0) # active power i to j
@@ -699,10 +679,10 @@ function build_ac_opf!(m::Model)
 
 
 
-    # m.ext[:constraints][:pbcvij] = @constraint(m, [(n,i,j) = B_tf_dc_ac], pb_dc_node[i] -  pb_ph_dc_ac[(n,i,j)] == (a_loss_cv[n]* ec[n] + b_loss_cv[n] * (-pb_ph_dc_ac[(n,i,j)]))) # check als tekens en richtigen goed zijn
-    m.ext[:constraints][:pbcvij] = @constraint(m, [(n,i,j) = B_tf_dc_ac],- pb_dc_node[i] -  pb_ph_dc_ac[(n,i,j)] == (a_loss_cv[n]* ec[n] + b_loss_cv[n] * (1 - 2*(ei[n]))*(i_cv[n]))) # check als tekens en richtigen goed zijn
-    # m.ext[:constraints][:pbcvij] = @constraint(m, [(n,i,j) = B_tf_dc_ac], -pb_dc_node[i] -  pb_ph_dc_ac[(n,i,j)] == 0) # check als tekens en richtigen goed zijn
-    m.ext[:constraints][:pqbcvij] = @constraint(m, [(n,i,j) = B_tf_dc_ac], pb_ph_dc_ac[(n,i,j)]^2 + qb_ph_dc_ac[(n,i,j)]^2 <= pmax_tf[n]^2 + qmax_tf[n]^2) # check als tekens en richtigen goed zijn
+    # m.ext[:constraints][:pbcvij] = @constraint(m, [(n,i,j) = B_tf_dc_ac], pb_dc_node[i] -  pb_ph_dc_ac[(n,i,j)] == (a_loss_cv[n]* ec[n] + b_loss_cv[n] * (-pb_ph_dc_ac[(n,i,j)])))
+    m.ext[:constraints][:pbcvij] = @constraint(m, [(n,i,j) = B_tf_dc_ac],- pb_dc_node[i] -  pb_ph_dc_ac[(n,i,j)] == (a_loss_cv[n]* ec[n] + b_loss_cv[n] * (1 - 2*(ei[n]))*(i_cv[n]))) # converter losses
+    # m.ext[:constraints][:pbcvij] = @constraint(m, [(n,i,j) = B_tf_dc_ac], -pb_dc_node[i] -  pb_ph_dc_ac[(n,i,j)] == 0)
+    m.ext[:constraints][:pqbcvij] = @constraint(m, [(n,i,j) = B_tf_dc_ac], pb_ph_dc_ac[(n,i,j)]^2 + qb_ph_dc_ac[(n,i,j)]^2 <= pmax_tf[n]^2 + qmax_tf[n]^2)
 
 
 
