@@ -571,23 +571,6 @@ function build_ac_opf!(m::Model)
 
 
 
-    # m.ext[:constraints][:pbij] = @constraint(m, [(b,i,j) = B_ac_fr], pb[(b, i, j)] ==  (gb[b] + gfr[b])*(1 + 2 *phi_i[i]) /b_tap[b]^2 - (gb[b] * (1 - 0*(va[i] - va[j] - b_shift[b]) + phi_i[i] + phi_i[j]))/b_tap[b] - (bb[b] * (va[i] - va[j]))/b_tap[b]) # active power i to j
-    # m.ext[:constraints][:qbij] = @constraint(m, [(b,i,j) = B_ac_fr], qb[(b, i, j)] == -(bb[b] + bfr[b])*(1 + 2 *phi_i[i]) /b_tap[b]^2 + (bb[b] * (1 - 0*(va[i] - va[j] - b_shift[b]) + phi_i[i] + phi_i[j]))/b_tap[b] - (gb[b] * (va[i] - va[j]))/b_tap[b]) # reactive power i to j
-    # m.ext[:constraints][:pbji] = @constraint(m, [(b,j,i) = B_ac_to], pb[(b, j, i)] ==  (gb[b] + gto[b])*(1 + 2 *phi_i[j]) - (gb[b] * (1 - 0*(va[i] - va[j] - b_shift[b]) + phi_i[j] + phi_i[i]))/b_tap[b] - (bb[b] * (va[j] - va[i]))/b_tap[b]) # active power j to i
-    # m.ext[:constraints][:qbji] = @constraint(m, [(b,j,i) = B_ac_to], qb[(b, j, i)] == -(bb[b] + bto[b])*(1 + 2 *phi_i[j]) + (bb[b] * (1 - 0*(va[i] - va[j] - b_shift[b]) + phi_i[j] + phi_i[i]))/b_tap[b] - (gb[b] * (va[j]- va[i]))/b_tap[b]) # reactive power j to i
-
-    # m.ext[:constraints][:pbij] = @constraint(m, [(b,i,j) = B_ac_fr], pb[(b, i, j)] == - (bb[b] * (va[i] - va[j]))/b_tap[b]) # active power i to j
-    # m.ext[:constraints][:qbij] = @constraint(m, [(b,i,j) = B_ac_fr], qb[(b, i, j)] == - (gb[b] * (va[i] - va[j]))/b_tap[b]) # reactive power i to j
-    # m.ext[:constraints][:pbji] = @constraint(m, [(b,j,i) = B_ac_to], pb[(b, j, i)] == - (bb[b] * (va[j] - va[i]))/b_tap[b]) # active power j to i
-    # m.ext[:constraints][:qbji] = @constraint(m, [(b,j,i) = B_ac_to], qb[(b, j, i)] == - (gb[b] * (va[j] - va[i]))/b_tap[b]) # reactive power j to i
-
-    # m.ext[:constraints][:pbij] = @constraint(m, [(b,i,j) = B_ac_fr], pb[(b, i, j)] ==  0) # active power i to j
-    # m.ext[:constraints][:qbij] = @constraint(m, [(b,i,j) = B_ac_fr], qb[(b, i, j)] == 0) # reactive power i to j
-    # m.ext[:constraints][:pbji] = @constraint(m, [(b,j,i) = B_ac_to], pb[(b, j, i)] ==  0) # active power j to i
-    # m.ext[:constraints][:qbji] = @constraint(m, [(b,j,i) = B_ac_to], qb[(b, j, i)] == 0) # reactive power j to i
-
-
-
     # # Thermal limits for the branches
     m.ext[:constraints][:sij] = @constraint(m, [(b,i,j) = B_ac_fr], pb[(b, i, j)]^2 + qb[(b, i, j)]^2 <= smax[b]^2)
     m.ext[:constraints][:sji] = @constraint(m, [(b,j,i) = B_ac_to], pb[(b, j, i)]^2 + qb[(b, j, i)]^2 <= smax[b]^2)
@@ -598,8 +581,6 @@ function build_ac_opf!(m::Model)
     m.ext[:constraints][:pbdcij] = @constraint(m, [(n,i,j) = B_dc_to], pb_dc[(n, i, j)] ==  (phi_dc_aux[(n,i)] - phi_dc_aux[(n,j)])/ (rd[n] + 0.001)) # active power i to j
     m.ext[:constraints][:pbdcji] = @constraint(m, [(n,i,j) = B_dc_fr], pb_dc[(n, i, j)] ==  (phi_dc_aux[(n,i)] - phi_dc_aux[(n,j)])/ (rd[n] + 0.001)) # active power i to j
 
-    # m.ext[:constraints][:pbdcij] = @constraint(m, [(n,i,j) = B_dc_to], pb_dc[(n, i, j)] ==  0) # active power i to j
-    # m.ext[:constraints][:pbdcji] = @constraint(m, [(n,i,j) = B_dc_fr], pb_dc[(n, i, j)] ==  0) # active power i to j
 
     ################transformer power flow contraint
 
@@ -608,32 +589,6 @@ function build_ac_opf!(m::Model)
     m.ext[:constraints][:qbtfacdcij] = @constraint(m, [(n,i,j) = B_tf_ac_dc], qb_tf_ac_dc[(n, i, j)] == (-btf[n] * (ec[n] + 2*phi_i_aux[i])/tc_tf[n]^2 + btf[n]*(ec[n]*cos_approx_tf_ij[(n,i,j)] + phi_i_aux[i] + phi_tf[j]) / tc_tf[n] - gtf[n]*(va_aux[i] - va_tf[j])  /tc_tf[n])) # reactive power i to j
     m.ext[:constraints][:pbtfdcacji] = @constraint(m, [(n,i,j) = B_tf_dc_ac], pb_tf_dc_ac[(n, i, j)] == ( gtf[n] * (ec[n] + 2*phi_i_aux[j]) - gtf[n]*(ec[n]*cos_approx_tf_ji[(n,i,j)] + phi_i_aux[j] + phi_tf[i]) / tc_tf[n] - btf[n]*(va_tf[i] - va_aux[j])  /tc_tf[n]))  # active power j to i
     m.ext[:constraints][:qbtfdcacji] = @constraint(m, [(n,i,j) = B_tf_dc_ac], qb_tf_dc_ac[(n, i, j)] == (-btf[n] * (ec[n] + 2*phi_i_aux[j]) + btf[n]*(ec[n]*cos_approx_tf_ji[(n,i,j)] + phi_i_aux[j] + phi_tf[i]) / tc_tf[n] - gtf[n]*(va_tf[i] - va_aux[j])  /tc_tf[n])) # reactive power j to i
-
-    # m.ext[:constraints][:pbtfacdcij] = @constraint(m, [(n,i,j) = B_tf_ac_dc], pb_tf_ac_dc[(n, i, j)] == ( gtf[n] * (ec[n] + 2*phi_i_aux[i]) - gtf[n]*(ec[n]*cos_approx_tf_ij[(n,i,j)] + phi_i_aux[i] + phi_tf[j]) - btf[n]*(va_aux[i] - va_tf[j]))) # active power i to j
-    # m.ext[:constraints][:qbtfacdcij] = @constraint(m, [(n,i,j) = B_tf_ac_dc], qb_tf_ac_dc[(n, i, j)] == (-btf[n] * (ec[n] + 2*phi_i_aux[i]) + btf[n]*(ec[n]*cos_approx_tf_ij[(n,i,j)] + phi_i_aux[i] + phi_tf[j]) - gtf[n]*(va_aux[i] - va_tf[j]))) # reactive power i to j
-    # m.ext[:constraints][:pbtfdcacji] = @constraint(m, [(n,i,j) = B_tf_dc_ac], pb_tf_dc_ac[(n, i, j)] == ( gtf[n] * (ec[n] + 2*phi_i_aux[j]) - gtf[n]*(ec[n]*cos_approx_tf_ji[(n,i,j)] + phi_i_aux[j] + phi_tf[i]) - btf[n]*(va_tf[i] - va_aux[j])))  # active power j to i
-    # m.ext[:constraints][:qbtfdcacji] = @constraint(m, [(n,i,j) = B_tf_dc_ac], qb_tf_dc_ac[(n, i, j)] == (-btf[n] * (ec[n] + 2*phi_i_aux[j]) + btf[n]*(ec[n]*cos_approx_tf_ji[(n,i,j)] + phi_i_aux[j] + phi_tf[i]) - gtf[n]*(va_tf[i] - va_aux[j]))) # reactive power j to i
-
-
-    
-
-    # m.ext[:constraints][:pbtfacdcij] = @constraint(m, [(n,i,j) = B_tf_ac_dc], pb_tf_ac_dc[(n, i, j)] == ( gtf[n] * (ec[n] + 2*phi_i_aux[i])/tc_tf[n]^2 - gtf[n]*(  (ec[n] - 0*(va_aux[i] - va_tf[j])) + phi_i_aux[i] + phi_tf[j]) / tc_tf[n] - btf[n]*(va_aux[i] - va_tf[j])  /tc_tf[n])) # active power i to j
-    # m.ext[:constraints][:qbtfacdcij] = @constraint(m, [(n,i,j) = B_tf_ac_dc], qb_tf_ac_dc[(n, i, j)] == (-btf[n] * (ec[n] + 2*phi_i_aux[i])/tc_tf[n]^2 + btf[n]*(  (ec[n] - 0*(va_aux[i] - va_tf[j])) + phi_i_aux[i] + phi_tf[j]) / tc_tf[n] - gtf[n]*(va_aux[i] - va_tf[j])  /tc_tf[n])) # reactive power i to j
-    # m.ext[:constraints][:pbtfdcacji] = @constraint(m, [(n,i,j) = B_tf_dc_ac], pb_tf_dc_ac[(n, i, j)] == ( gtf[n] * (ec[n] + 2*phi_i_aux[j]) - gtf[n]*(  (ec[n] - 0*(va_aux[j] - va_tf[i])) + phi_i_aux[j] + phi_tf[i]) / tc_tf[n] - btf[n]*(va_tf[i] - va_aux[j])  /tc_tf[n]))  # active power j to i
-    # m.ext[:constraints][:qbtfdcacji] = @constraint(m, [(n,i,j) = B_tf_dc_ac], qb_tf_dc_ac[(n, i, j)] == (-btf[n] * (ec[n] + 2*phi_i_aux[j]) + btf[n]*(  (ec[n] - 0*(va_aux[j] - va_tf[i])) + phi_i_aux[j] + phi_tf[i]) / tc_tf[n] - gtf[n]*(va_tf[i] - va_aux[j])  /tc_tf[n])) # reactive power j to i
-
-
-    # m.ext[:constraints][:pbtfacdcij] = @constraint(m, [(n,i,j) = B_tf_ac_dc], pb_tf_ac_dc[(n, i, j)] == ( gtf[n] * (ec[n] + 2*phi_i_aux[i]) - gtf[n]*(ec[n] + phi_i_aux[i] + phi_tf[j]) - btf[n]*(va_aux[i] - va_tf[j])  )) # active power i to j
-    # m.ext[:constraints][:qbtfacdcij] = @constraint(m, [(n,i,j) = B_tf_ac_dc], qb_tf_ac_dc[(n, i, j)] == (-btf[n] * (ec[n] + 2*phi_i_aux[i]) + btf[n]*(ec[n] + phi_i_aux[i] + phi_tf[j]) - gtf[n]*(va_aux[i] - va_tf[j])  )) # reactive power i to j
-    # m.ext[:constraints][:pbtfdcacji] = @constraint(m, [(n,i,j) = B_tf_dc_ac], pb_tf_dc_ac[(n, i, j)] == ( gtf[n] * (ec[n] + 2*phi_i_aux[j]) - gtf[n]*(ec[n] + phi_i_aux[j] + phi_tf[i]) - btf[n]*(va_tf[i] - va_aux[j])  ))  # active power j to i
-    # m.ext[:constraints][:qbtfdcacji] = @constraint(m, [(n,i,j) = B_tf_dc_ac], qb_tf_dc_ac[(n, i, j)] == (-btf[n] * (ec[n] + 2*phi_i_aux[j]) + btf[n]*(ec[n] + phi_i_aux[j] + phi_tf[i]) - gtf[n]*(va_tf[i] - va_aux[j])  )) # reactive power j to i
-
-
-
-    # m.ext[:constraints][:pbtfacdcij] = @constraint(m, [(n,i,j) = B_tf_ac_dc], pb_tf_ac_dc[(n, i, j)] == 0) # active power i to j
-    # m.ext[:constraints][:qbtfacdcij] = @constraint(m, [(n,i,j) = B_tf_ac_dc], qb_tf_ac_dc[(n, i, j)] == 0) # reactive power i to j
-    # m.ext[:constraints][:pbtfdcacji] = @constraint(m, [(n,i,j) = B_tf_dc_ac], pb_tf_dc_ac[(n, i, j)] == 0)  # active power j to i
-    # m.ext[:constraints][:qbtfdcacji] = @constraint(m, [(n,i,j) = B_tf_dc_ac], qb_tf_dc_ac[(n, i, j)] == 0) # reactive power j to i
 
 
     # # # Filter
@@ -650,19 +605,6 @@ function build_ac_opf!(m::Model)
     m.ext[:constraints][:pbphdcacji] = @constraint(m, [(n,i,j) = B_tf_dc_ac], qb_ph_dc_ac[(n, i, j)] == (-bc[n] * (ec[n] + 2*phi_tf_aux[i]) + bc[n]*(ec[n]*cos_approx_ph_ji[(n, i, j)] + phi_tf_aux[i] + phi_ph[i]) - gc[n]*(va_ph[i] - va_tf_aux[i])  )) # reactive power j to i
 
 
-    # m.ext[:constraints][:pbphacdcij] = @constraint(m, [(n,i,j) = B_tf_ac_dc], pb_ph_ac_dc[(n, i, j)] == ( gc[n] * (ec[n] + 2*phi_tf_aux[j]) - gc[n]*(  (ec[n] - 0*(va_tf[j] - va_ph[j])) + phi_tf_aux[j] + phi_ph[j]) - bc[n]*(va_tf_aux[j] - va_ph[j])  )) # active power i to j
-    # m.ext[:constraints][:qbphacdcij] = @constraint(m, [(n,i,j) = B_tf_ac_dc], qb_ph_ac_dc[(n, i, j)] == (-bc[n] * (ec[n] + 2*phi_tf_aux[j]) + bc[n]*(  (ec[n] - 0*(va_tf[j] - va_ph[j])) + phi_tf_aux[j] + phi_ph[j]) - gc[n]*(va_tf_aux[j] - va_ph[j]) )) # reactive power i to j
-    # m.ext[:constraints][:pbphdcacji] = @constraint(m, [(n,i,j) = B_tf_dc_ac], pb_ph_dc_ac[(n, i, j)] == ( gc[n] * (ec[n] + 2*phi_tf_aux[i]) - gc[n]*(  (ec[n] - 0*(va_tf[i] - va_tf[i])) + phi_tf_aux[i] + phi_ph[i]) - bc[n]*(va_ph[i] - va_tf_aux[i])  ))  # active power j to i
-    # m.ext[:constraints][:pbphdcacji] = @constraint(m, [(n,i,j) = B_tf_dc_ac], qb_ph_dc_ac[(n, i, j)] == (-bc[n] * (ec[n] + 2*phi_tf_aux[i]) + bc[n]*(  (ec[n] - 0*(va_tf[i] - va_tf[i])) + phi_tf_aux[i] + phi_ph[i]) - gc[n]*(va_ph[i] - va_tf_aux[i])  )) # reactive power j to i
-
-
-
-    # # m.ext[:constraints][:pbphacdcij] = @constraint(m, [(n,i,j) = B_tf_ac_dc], pb_ph_ac_dc[(n, i, j)] == 0) # active power i to j
-    # # m.ext[:constraints][:qbphacdcij] = @constraint(m, [(n,i,j) = B_tf_ac_dc], qb_ph_ac_dc[(n, i, j)] == 0) # reactive power i to j
-    # # m.ext[:constraints][:pbphdcacji] = @constraint(m, [(n,i,j) = B_tf_dc_ac], pb_ph_dc_ac[(n, i, j)] == 0)  # active power j to i
-    # # m.ext[:constraints][:qbphdcacji] = @constraint(m, [(n,i,j) = B_tf_dc_ac], qb_ph_dc_ac[(n, i, j)] == 0) # reactive power j to i
-
-
 
     ####### converter power flow constraint
 
@@ -671,17 +613,8 @@ function build_ac_opf!(m::Model)
 
 
 
-    # m.ext[:constraints][:ec_ed_con] =  @constraint(m, [i in N_dc_ac_connected], sum(ed[n] for (n,k,j) in B_dc_arcs[i]) >= ec[i]) 
-    # m.ext[:constraints][:ec_ed_con] =  @constraint(m, [(n,i,j) in B_dc_to], ec[j] + ec[i] >= 1.1*ed[n]) 
 
-
-
-
-
-
-    # m.ext[:constraints][:pbcvij] = @constraint(m, [(n,i,j) = B_tf_dc_ac], pb_dc_node[i] -  pb_ph_dc_ac[(n,i,j)] == (a_loss_cv[n]* ec[n] + b_loss_cv[n] * (-pb_ph_dc_ac[(n,i,j)])))
     m.ext[:constraints][:pbcvij] = @constraint(m, [(n,i,j) = B_tf_dc_ac],- pb_dc_node[i] -  pb_ph_dc_ac[(n,i,j)] == (a_loss_cv[n]* ec[n] + b_loss_cv[n] * (1 - 2*(ei[n]))*(i_cv[n]))) # converter losses
-    # m.ext[:constraints][:pbcvij] = @constraint(m, [(n,i,j) = B_tf_dc_ac], -pb_dc_node[i] -  pb_ph_dc_ac[(n,i,j)] == 0)
     m.ext[:constraints][:pqbcvij] = @constraint(m, [(n,i,j) = B_tf_dc_ac], pb_ph_dc_ac[(n,i,j)]^2 + qb_ph_dc_ac[(n,i,j)]^2 <= pmax_tf[n]^2 + qmax_tf[n]^2)
 
 
@@ -697,16 +630,6 @@ function build_ac_opf!(m::Model)
     m.ext[:constraints][:thetaij] = @constraint(m, [(b,j,i) = B_ac_to], va[j] - va[i] <= angmax[b])
     m.ext[:constraints][:thetaji] = @constraint(m, [(b,j,i) = B_ac_to], va[j] - va[i] >= angmin[b])
 
-    # m.ext[:constraints][:thetaij_tf] = @constraint(m, [(b,i,j) = B_tf_ac_dc], va[i] - va_tf[j] <= angmax[b])
-    # m.ext[:constraints][:thetaji_tf] = @constraint(m, [(b,i,j) = B_tf_ac_dc], va[i] - va_tf[j] >= angmin[b])
-    # m.ext[:constraints][:thetaij_tf] = @constraint(m, [(b,j,i) = B_tf_dc_ac], va_tf[j] - va[i] <= angmax[b])
-    # m.ext[:constraints][:thetaji_tf] = @constraint(m, [(b,j,i) = B_tf_dc_ac], va_tf[j] - va[i] >= angmin[b])
-
-    # m.ext[:constraints][:thetaij_ph] = @constraint(m, [(b,i,j) = B_tf_ac_dc], va_tf[i] - va_ph[j] <= angmax[b])
-    # m.ext[:constraints][:thetaji_ph] = @constraint(m, [(b,i,j) = B_tf_ac_dc], va_tf[i] - va_ph[j] >= angmin[b])
-    # m.ext[:constraints][:thetaij_ph] = @constraint(m, [(b,j,i) = B_tf_dc_ac], va_ph[j] - va_tf[i] <= angmax[b])
-    # m.ext[:constraints][:thetaji_ph] = @constraint(m, [(b,j,i) = B_tf_dc_ac], va_ph[j] - va_tf[i] >= angmin[b])
-
 
 
     # # Kirchhoff's current law, i.e., nodal power balance
@@ -716,9 +639,7 @@ function build_ac_opf!(m::Model)
     m.ext[:constraints][:p_balance] = @constraint(m, [i in N_no_dc_connected], sum(pg[g] for g in G_ac[i]) - sum(pd[l] for l in L_ac[i]) == sum(pb[(b,i,j)] for (b,i,j) in B_arcs[i]) )
     m.ext[:constraints][:q_balance] = @constraint(m, [i in N_no_dc_connected], sum(qg[g] for g in G_ac[i]) - sum(qd[l] for l in L_ac[i]) == sum(qb[(b,i,j)] for (b,i,j) in B_arcs[i]) )
 
-    # m.ext[:constraints][:p_balance] = @constraint(m, [i in N], sum(pg[g] for g in G_ac[i]) - sum(pd[l] for l in L_ac[i]) == sum(pb[(b,i,j)] for (b,i,j) in B_arcs[i]) )
-    # m.ext[:constraints][:q_balance] = @constraint(m, [i in N], sum(qg[g] for g in G_ac[i]) - sum(qd[l] for l in L_ac[i]) == sum(qb[(b,i,j)] for (b,i,j) in B_arcs[i]) )
- 
+
 
     m.ext[:constraints][:varef] = @constraint(m, [n_sl in N_sl], va[n_sl] == 0)
     return m 

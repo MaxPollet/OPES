@@ -18,11 +18,8 @@ m = Model(juniper)
 # ipopt = optimizer_with_attributes(Juniper.Optimizer)
 
 ##### Step 1: Import the grid data and initialize the JuMP model
-# case_file = "PowerModelsACDC.jl-master/test/data/tnep/case9_test.m"
-# case_file = "PowerModelsACDC.jl-master/test/data/tnep/pglib_opf_case5_pjm.m"
-# case_file = "PowerModelsACDC.jl-master/test/data/tnep/PSCC/case9.m"
-# case_file = "PowerModelsACDC.jl-master/test/data/tnep/case14_test.m"
-case_file = "PowerModelsACDC.jl-master/test/data/tnep/PSCC/case14.m"
+case_file = "data/case9.m"
+# case_file = "data/case14.m"
 
 
 # For convenience, use the parser of Powermodels to convert the MATPOWER format file to a Julia dictionary
@@ -54,18 +51,18 @@ println(objective_value(m)) # Print the objective value of the model
 # print(Dict("objectilnve"=>objective_value(m),"objective_pm"=>result_pm["objective"])) # Compare the objective values
 
 
-pg = value.(m.ext[:variables][:pg])
+# pg = value.(m.ext[:variables][:pg])
 
 #####
 
 ####### see what the power is on the ac branch
-println("Power through ac branch")
-for (n,j,i) in m.ext[:sets][:B_ac]
-    print((n,j,i))
-    print("=>")
-    println(value.(m.ext[:variables][:pb][(n,j,i)]))
+# println("Power through ac branch")
+# for (n,j,i) in m.ext[:sets][:B_ac]
+#     print((n,j,i))
+#     print("=>")
+#     println(value.(m.ext[:variables][:pb][(n,j,i)]))
     
-end
+# end
 
 
 
@@ -88,30 +85,30 @@ end
 
 ####### see which dc branch is switched on 
 
-println("see which dc branch is switched on ")
-for (n,j,i) in m.ext[:sets][:B_dc_to]
-    c = parse(Float64, n)
-    if (c >= 10)
+# println("see which dc branch is switched on ")
+# for (n,j,i) in m.ext[:sets][:B_dc_to]
+#     c = parse(Float64, n)
+#     if (c >= 10)
     
-        if value.(m.ext[:variables][:ed][n]) > 0.1
-            print((n,j,i) )
-            print("=>")
-            println(value.(m.ext[:variables][:ed][n,]))
-            # println(value.(m.ext[:variables][:ed][n]))
-        end
-    else
+#         if value.(m.ext[:variables][:ed][n]) > 0.1
+#             print((n,j,i) )
+#             print("=>")
+#             println(value.(m.ext[:variables][:ed][n,]))
+#             # println(value.(m.ext[:variables][:ed][n]))
+#         end
+#     else
         
-        if value.(m.ext[:variables][:ed][n]) > 0.1
-            print((n,j,i) )
-            print(" =>")
-            println(value.(m.ext[:variables][:ed][n,]))
-            # println(value.(m.ext[:variables][:ed][n]))
-        end
-    end
-end
+#         if value.(m.ext[:variables][:ed][n]) > 0.1
+#             print((n,j,i) )
+#             print(" =>")
+#             println(value.(m.ext[:variables][:ed][n,]))
+#             # println(value.(m.ext[:variables][:ed][n]))
+#         end
+#     end
+# end
 
 
-println("see the dc branch power if non zero ")
+# println("see the dc branch power if non zero ")
 for (n,j,i) in m.ext[:sets][:B_dc_to]
     c = parse(Float64, n)
     if (c >= 10)
@@ -134,27 +131,27 @@ for (n,j,i) in m.ext[:sets][:B_dc_to]
 end
 
 
-println("see the power from converter into dc net if non zero ")
-for n in m.ext[:sets][:N_tf]
-    c = parse(Float64, n)
-    if (c >= 10)
+# println("see the power from converter into dc net if non zero ")
+# for n in m.ext[:sets][:N_tf]
+#     c = parse(Float64, n)
+#     if (c >= 10)
     
-        if value.(m.ext[:variables][:ec][n]) > 0.1
-            print(n )
-            print("=>")
-            println(value.(m.ext[:variables][:pb_dc_node][n]))
-            # println(value.(m.ext[:variables][:ed][n]))
-        end
-    else
+#         if value.(m.ext[:variables][:ec][n]) > 0.1
+#             print(n )
+#             print("=>")
+#             println(value.(m.ext[:variables][:pb_dc_node][n]))
+#             # println(value.(m.ext[:variables][:ed][n]))
+#         end
+#     else
         
-        if value.(m.ext[:variables][:ec][n]) > 0.1
-            print(n)
-            print(" =>")
-            println(value.(m.ext[:variables][:pb_dc_node][n]))
-            # println(value.(m.ext[:variables][:ed][n]))
-        end
-    end
-end
+#         if value.(m.ext[:variables][:ec][n]) > 0.1
+#             print(n)
+#             print(" =>")
+#             println(value.(m.ext[:variables][:pb_dc_node][n]))
+#             # println(value.(m.ext[:variables][:ed][n]))
+#         end
+#     end
+# end
 
 
 
@@ -201,34 +198,34 @@ end
 
 
 
-println("see what the power through the transfor to the dc side is: ")
-for n in m.ext[:sets][:N_tf]
-        print(n)
-        print("=>")
-        println(value.(m.ext[:variables][:pb_tf_ac_dc][(n,n,n)]))
-end
+# println("see what the power through the transfor to the dc side is: ")
+# for n in m.ext[:sets][:N_tf]
+#         print(n)
+#         print("=>")
+#         println(value.(m.ext[:variables][:pb_tf_ac_dc][(n,n,n)]))
+# end
 
 
 
-println("Total DC losses ")
-sumy = 0
-for n in m.ext[:sets][:N]
-        sumy = sumy + value(m.ext[:variables][:pb_tf_ac_dc][(n,n,n)])
+# println("Total DC losses ")
+# sumy = 0
+# for n in m.ext[:sets][:N]
+#         sumy = sumy + value(m.ext[:variables][:pb_tf_ac_dc][(n,n,n)])
 
-end
+# end
 
-print("=>")
-println(sumy)
+# print("=>")
+# println(sumy)
 
 
-println("Total AC branch losses ")
-sumy = 0
-for (n,i,j) in m.ext[:sets][:B_ac]
-        sumy = sumy + value(m.ext[:variables][:pb][(n,i,j)])
+# println("Total AC branch losses ")
+# sumy = 0
+# for (n,i,j) in m.ext[:sets][:B_ac]
+#         sumy = sumy + value(m.ext[:variables][:pb][(n,i,j)])
 
-end
+# end
 
-print("=>")
-println(sumy)
+# print("=>")
+# println(sumy)
 
 
